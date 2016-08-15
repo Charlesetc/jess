@@ -63,16 +63,17 @@ file *new_file(char *filename) {
     return f;
 }
 
+void print_file(file *f) {
+    rope *current_line = f->text;
+    printf("----< %s >----\n", f->filename);
+    do {
+       printf("%s", current_line->content.content);
+    } while ((current_line = current_line->next));
+    for (int i = 0; i < strlen(f->filename); i++) printf("-");
+    printf("------------\n");
+}
+
 int main(int argc, char **argv) { int returned;
     file *f = new_file("text.txt");
-    rope *current_line = f->text;
-    do {
-        printf("%s", current_line->content.content);
-    } while ((current_line = current_line->next));
-    // do {
-    //     size_t input_length;
-    //     char *input = NULL;
-    //     returned = getline(&input, &input_length, stdin);
-    //     printf("%s\n", input);
-    // } while (returned != -1);
+    print_file(f);
 }
