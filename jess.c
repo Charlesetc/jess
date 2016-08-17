@@ -15,7 +15,7 @@ typedef struct {
 typedef struct rope {
     struct rope *next;
     struct rope *last;
-    string content;
+    string *content;
 } rope;
 
 typedef struct {
@@ -25,12 +25,12 @@ typedef struct {
     rope *current_line;
 } file;
 
-string new_string(char *content, int length) {
-    string s;
+string *new_string(char *content, int length) {
+    string *s = (string *)malloc(sizeof(string));
     if (length == -1)
         length = strlen(content);
-    s.content = content;
-    s.length = length;
+    s->content = content;
+    s->length = length;
     return s;
 }
 
@@ -40,6 +40,15 @@ rope *new_rope(char *content) {
     r->last = NULL;
     r->content = new_string(content, -1);
     return r;
+}
+
+rope *nth_rope(rope *r, int n) {
+    rope *current = r;
+    for (int i = 0; i < n; i++) {
+        current = current->next;
+        if (!current) return NULL;
+    }
+    return current;
 }
 
 void insert_line(file *f, char *s) {
@@ -71,7 +80,7 @@ void print_file(file *f) {
     rope *current_line = f->text;
     printf("----< %s >----\n", f->filename);
     do {
-        printf("%s", current_line->content.content);
+        printf("%s", current_line->content->content);
     } while ((current_line = current_line->next));
     for (int i = 0; i < strlen(f->filename); i++) printf("-");
     printf("------------\n");
@@ -86,7 +95,7 @@ range parse_range(char **remaining) {
     if (input[0] == ',') {
         input++;
         goto parse_end_range;
-    } else if (input[0] < '9' && input[0] > '0') {
+    } else if (IS_DIGIT(input[0])) {
         start = strtol(input, &input, 10);
         if (input[0] == ',') {
             input++;
@@ -102,7 +111,7 @@ range parse_range(char **remaining) {
     }
 
 parse_end_range:
-    if (input[0] < '9' && input[0] > '0') {
+    if (IS_DIGIT(input[0])) {
         end = strtol(input, &input, 10);
     }
 final:
@@ -113,7 +122,18 @@ final:
     return r;
 }
 
-int main(int argc, char **argv) { int returned;
+void execute_command(file *f, range r, char command, char *remaining) {
+    switch (command) {
+        case '\0':
+            if (r.start == r.end and r.start >= 0) {
+                rope *nth = nth_rope(f->text, r.start);
+                f->current_line = nth ? nth : f->current_line;
+            }
+    }
+}
+
+int main(int argc, char **argv) {
+    int returned;
     file *f = new_file("text.txt");
     print_file(f);
 
@@ -121,6 +141,8 @@ int main(int argc, char **argv) { int returned;
     while (fgets(input, MAX_INPUT_LENGTH, stdin)) {
         char *remaining = input;
         range r = parse_range(&remaining);
-        printf("[%d, %d]:%s", r.start, r.end, remaining);
+        remaining[strlen(remaining)-1] = '\0';
+        execute_command(f, r, remaining[0], remaining+1);
+        printf("%s\n", f->current_line->content->content);
     }
 }
