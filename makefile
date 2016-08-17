@@ -3,6 +3,6 @@
 CC=clang
 
 run: jess
-	./jess
+	./jess text.txt
 
 jess: jess.o

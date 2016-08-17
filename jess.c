@@ -29,7 +29,8 @@ string *new_string(char *content, int length) {
     string *s = (string *)malloc(sizeof(string));
     if (length == -1)
         length = strlen(content);
-    s->content = content;
+    // allocate content on the heap
+    s->content = strdup(content);
     s->length = length;
     return s;
 }
@@ -44,7 +45,7 @@ rope *new_rope(char *content) {
 
 rope *nth_rope(rope *r, int n) {
     rope *current = r;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < n; ++i) {
         current = current->next;
         if (!current) return NULL;
     }
@@ -71,7 +72,7 @@ file *new_file(char *filename) {
     f->filename = filename;
     char *s = (char *)malloc(MAX_LENGTH + 1);
     while (fgets(s, MAX_LENGTH, descriptor)) {
-        append_line(f, strdup(s));
+        append_line(f, s);
     }
     return f;
 }
@@ -82,21 +83,21 @@ void print_file(file *f) {
     do {
         printf("%s", current_line->content->content);
     } while ((current_line = current_line->next));
-    for (int i = 0; i < strlen(f->filename); i++) printf("-");
+    for (int i = 0; i < strlen(f->filename); ++i) printf("-");
     printf("------------\n");
 }
 
 bool empty_range(range r) {
-    return r.start == -2 and r.end == 2;
+    return r.start == -2 and r.end == -2;
 }
 
 bool single_range(range r) {
-    return r.start == r.end and r.start >= 0;
+    return r.start == r.end and not empty_range(r);
 }
 
 range parse_range(char **remaining) {
-    int start = -1;
-    int end = -1;
+    int start = 0;
+    int end = INT_MAX;
 
     char *input = *remaining;
 
@@ -140,29 +141,81 @@ void current_from_range(file *f, range r) {
     if (single_range(r)) set_current_to(f, r.start);
 }
 
-void execute_command(file *f, range r, char command, char *remaining) {
-    switch (command) {
-        case 'a':
-            current_from_range(f, r);
-        case '\0':
-            current_from_range(f, r);
+void print_range(file *f, range r) {
+    rope *current = nth_rope(f->text, r.start);
+    for (int i = 0; i <= r.end - r.start; ++i) {
+        if (!current) break;
+        printf("%s", current->content->content);
+        current = current->next;
     }
 }
 
+void print_current_line(file *f) {
+    printf("%s", f->current_line->content->content);
+}
+
+void execute_command(file *f, range r, char command, char *remaining) {
+    switch (command) {
+        case 'p':
+            if (empty_range(r))
+                print_current_line(f);
+            else
+                print_range(f, r);
+            break;
+        case 'a':
+            current_from_range(f, r);
+
+            // append things without going into
+            // append mode
+            if (strlen(remaining) != 0) {
+                append_line(f, remaining);
+                return;
+            }
+
+            char input[MAX_INPUT_LENGTH];
+            while (fgets(input, MAX_INPUT_LENGTH, stdin)) {
+                // not yet implemented
+                return;
+            }
+            break;
+        case '\0':
+            current_from_range(f, r);
+            print_current_line(f);
+            break;
+        default:
+            printf("unknown command\n");
+    }
+}
+
+void prompt(void) {
+    printf(">> ");
+}
+
+void error(char *message) {
+    printf("\n%s\n", message);
+    exit(0);
+}
+
+void error_usage(void) {
+    error("usage: jess [file]");
+};
+
 int main(int argc, char **argv) {
     int returned;
-    file *f = new_file("text.txt");
+    if (argc <= 1) error_usage();
+    file *f = new_file(argv[1]);
     print_file(f);
 
     // current line is start
     set_current_to(f, 0);
 
+    prompt();
     char input[MAX_INPUT_LENGTH];
     while (fgets(input, MAX_INPUT_LENGTH, stdin)) {
         char *remaining = input;
         range r = parse_range(&remaining);
         remaining[strlen(remaining)-1] = '\0';
         execute_command(f, r, remaining[0], remaining+1);
-        printf("%s\n", f->current_line->content->content);
+        prompt();
     }
 }
