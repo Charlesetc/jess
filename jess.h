@@ -1,4 +1,4 @@
-
+// jess.h
 
 #include<stdlib.h>
 #include<stdio.h>
@@ -11,3 +11,6 @@
 #define IS_DIGIT(c) (c <= '9' and c >= '0')
 #define and &&
 #define or ||
+#define bool int
+#define true 1
+#define false 0

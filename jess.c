@@ -51,7 +51,7 @@ rope *nth_rope(rope *r, int n) {
     return current;
 }
 
-void insert_line(file *f, char *s) {
+void append_line(file *f, char *s) {
     rope *r = new_rope(s);
     if (f->current_line) {
         r->next = f->current_line->next;
@@ -71,7 +71,7 @@ file *new_file(char *filename) {
     f->filename = filename;
     char *s = (char *)malloc(MAX_LENGTH + 1);
     while (fgets(s, MAX_LENGTH, descriptor)) {
-        insert_line(f, strdup(s));
+        append_line(f, strdup(s));
     }
     return f;
 }
@@ -84,6 +84,14 @@ void print_file(file *f) {
     } while ((current_line = current_line->next));
     for (int i = 0; i < strlen(f->filename); i++) printf("-");
     printf("------------\n");
+}
+
+bool empty_range(range r) {
+    return r.start == -2 and r.end == 2;
+}
+
+bool single_range(range r) {
+    return r.start == r.end and r.start >= 0;
 }
 
 range parse_range(char **remaining) {
@@ -105,6 +113,7 @@ range parse_range(char **remaining) {
             goto final;
         }
     } else {
+        // range is (-2, -2) if there is no range
         start = -2;
         end = -2;
         goto final;
@@ -122,13 +131,21 @@ final:
     return r;
 }
 
+void set_current_to(file *f, int i) {
+    rope *nth = nth_rope(f->text, i);
+    f->current_line = nth ? nth : f->current_line;
+}
+
+void current_from_range(file *f, range r) {
+    if (single_range(r)) set_current_to(f, r.start);
+}
+
 void execute_command(file *f, range r, char command, char *remaining) {
     switch (command) {
+        case 'a':
+            current_from_range(f, r);
         case '\0':
-            if (r.start == r.end and r.start >= 0) {
-                rope *nth = nth_rope(f->text, r.start);
-                f->current_line = nth ? nth : f->current_line;
-            }
+            current_from_range(f, r);
     }
 }
 
@@ -136,6 +153,9 @@ int main(int argc, char **argv) {
     int returned;
     file *f = new_file("text.txt");
     print_file(f);
+
+    // current line is start
+    set_current_to(f, 0);
 
     char input[MAX_INPUT_LENGTH];
     while (fgets(input, MAX_INPUT_LENGTH, stdin)) {
