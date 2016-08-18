@@ -156,6 +156,8 @@ void print_current_line(file *f) {
 
 void execute_command(file *f, range r, char command, char *remaining) {
     switch (command) {
+        case 'q':
+            exit(0);
         case 'p':
             if (empty_range(r))
                 print_current_line(f);
@@ -180,7 +182,8 @@ void execute_command(file *f, range r, char command, char *remaining) {
             break;
         case '\0':
             current_from_range(f, r);
-            print_current_line(f);
+            if (single_range(r))
+                print_current_line(f);
             break;
         default:
             printf("unknown command\n");
