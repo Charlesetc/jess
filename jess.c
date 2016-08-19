@@ -1,7 +1,6 @@
 // jess.c
 
 #include "jess.h"
-
 typedef struct {
     int length;
     char *content;
@@ -23,7 +22,31 @@ typedef struct {
     char *filename;
     rope *text;
     rope *current_line;
+    int current_line_number;
 } file;
+
+// TODO: Move this elsewhere
+char *
+robust_fgets(char *dst, int max, FILE *fp)
+{
+        int c;
+        char *p;
+
+        /* get max bytes or upto a newline */
+
+        for (p = dst, max--; max > 0; max--) {
+                if ((c = fgetc (fp)) == EOF)
+                        break;
+                *p++ = c;
+                if (c == '\n')
+                        break;
+        }
+        *p = 0;
+        if (p == dst || c == EOF)
+                return NULL;
+        return (p);
+}
+
 
 string *new_string(char *content, int length) {
     string *s = (string *)malloc(sizeof(string));
@@ -35,12 +58,28 @@ string *new_string(char *content, int length) {
     return s;
 }
 
+void free_string(string *s) {
+    // free(s->content);
+    //free(s);
+}
+
+void string_append(string *s, char *adding) {
+    int new_length = strlen(s->content) + strlen(adding);
+    s->content = (char *)realloc(s->content, new_length + 1);
+    strcat(s->content + strlen(s->content), adding);
+}
+
 rope *new_rope(char *content) {
     rope *r = (rope *)malloc(sizeof(rope));
     r->next = NULL;
     r->last = NULL;
     r->content = new_string(content, -1);
     return r;
+}
+
+void free_rope(rope *r) {
+    free_string(r->content);
+    //free(r);
 }
 
 rope *nth_rope(rope *r, int n) {
@@ -77,6 +116,32 @@ file *new_file(char *filename) {
     return f;
 }
 
+void delete_rope(file *f, rope *current, int repeat) {
+    for (int i = 0; i < repeat; ++i) {
+        if (!current) break;
+        // if there's a current_line in the range,
+        // make the new current line in the proper place.
+        if (f->current_line == current) {
+            if (current->last)
+            {
+                printf("hi!");
+                f->current_line = current->last;
+            }
+            else
+            {
+                printf("hi!");
+                f->current_line = current->next;
+            }
+        }
+        // do the swipity-swap
+        if (current->next) current->next->last = current->last;
+        if (current->last) current->last->next = current->next;
+        rope *last = current->last;
+        free_rope(current);
+        current = last;
+    }
+}
+
 void print_file(file *f) {
     rope *current_line = f->text;
     printf("----< %s >----\n", f->filename);
@@ -100,8 +165,7 @@ range parse_range(char **remaining) {
     int end = INT_MAX;
 
     char *input = *remaining;
-
-    if (input[0] == ',') {
+if (input[0] == ',') {
         input++;
         goto parse_end_range;
     } else if (IS_DIGIT(input[0])) {
@@ -134,17 +198,22 @@ final:
 
 void set_current_to(file *f, int i) {
     rope *nth = nth_rope(f->text, i);
-    f->current_line = nth ? nth : f->current_line;
+    if (nth) {
+        f->current_line = nth;
+        f->current_line_number = i;
+    }
 }
 
 void current_from_range(file *f, range r) {
     if (single_range(r)) set_current_to(f, r.start);
 }
 
-void print_range(file *f, range r) {
+void print_range(file *f, range r, char *flag) {
     rope *current = nth_rope(f->text, r.start);
     for (int i = 0; i <= r.end - r.start; ++i) {
         if (!current) break;
+        if (flag and !strcmp(flag, "include_line_numbers"))
+            printf("%d ", r.start + i);
         printf("%s", current->content->content);
         current = current->next;
     }
@@ -158,26 +227,50 @@ void execute_command(file *f, range r, char command, char *remaining) {
     switch (command) {
         case 'q':
             exit(0);
+            break; // EXTREMELY IMPORTANT
+        case 'n':
+            if (empty_range(r)) {
+                printf("%d ", f->current_line_number);
+                print_current_line(f);
+            } else {
+                print_range(f, r, "include_line_numbers");
+            }
+            break;
         case 'p':
             if (empty_range(r))
                 print_current_line(f);
             else
-                print_range(f, r);
+                print_range(f, r, NULL);
+            break;
+        case 'd':
+            if (empty_range(r)) {
+                delete_rope(f, f->current_line, 1);
+            } else {
+                rope *rpe = nth_rope(f->text, r.start);
+                if (rpe)
+                    delete_rope(f, rpe, r.end - r.start + 1);
+            }
             break;
         case 'a':
             current_from_range(f, r);
+
+            // don't count that space
+            if (remaining[0] == ' ')
+                remaining = remaining + 1;
 
             // append things without going into
             // append mode
             if (strlen(remaining) != 0) {
                 append_line(f, remaining);
+                string_append(f->current_line->content, "\n");
                 return;
             }
 
+            // read and append until "." or ^D
             char input[MAX_INPUT_LENGTH];
             while (fgets(input, MAX_INPUT_LENGTH, stdin)) {
-                // not yet implemented
-                return;
+                if (!strcmp(input, ".\n")) break;
+                append_line(f, input);
             }
             break;
         case '\0':
