@@ -59,8 +59,8 @@ string *new_string(char *content, int length) {
 }
 
 void free_string(string *s) {
-    // free(s->content);
-    //free(s);
+    free(s->content);
+    free(s);
 }
 
 void string_append(string *s, char *adding) {
@@ -123,15 +123,15 @@ void delete_rope(file *f, rope *current, int repeat) {
         // make the new current line in the proper place.
         if (f->current_line == current) {
             if (current->last)
-            {
-                printf("hi!");
                 f->current_line = current->last;
-            }
             else
-            {
-                printf("hi!");
                 f->current_line = current->next;
-            }
+        }
+        if (f->text == current) {
+            if (current->last)
+                f->text = current->last;
+            else
+                f->text = current->next;
         }
         // do the swipity-swap
         if (current->next) current->next->last = current->last;
