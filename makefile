@@ -5,6 +5,8 @@ CC=clang
 run: jess regenerate_readme
 	./jess text.txt
 
+build: jess
+
 jess: jess.o
 
 regenerate_readme:
